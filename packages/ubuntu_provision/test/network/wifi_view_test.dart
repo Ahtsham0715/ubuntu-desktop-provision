@@ -174,10 +174,66 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(selected, 4);
     expect(activated, isEmpty);
+
+    // the second click selects the double-clicked access point again before
+    // activating it, so it is connected even if the selection changed
+    clearInteractions(device);
     await tester.tap(ap);
     await tester.pump(kDoubleTapTimeout + const Duration(milliseconds: 1));
-    expect(selected, 4);
+    verify(device.selectAccessPoint(accessPoint)).called(1);
+    expect(selected, 5);
     expect(activated, equals([(device, accessPoint)]));
+  });
+
+  testWidgets('dragging a row still scrolls the list with double-click enabled',
+      (tester) async {
+    final device = MockWifiDevice();
+    when(device.model).thenReturn('model');
+    when(device.scanning).thenReturn(false);
+    when(device.isConnecting).thenReturn(false);
+    when(device.isAvailable).thenReturn(true);
+    when(device.isActive).thenReturn(false);
+
+    final accessPoints = <AccessPoint>[
+      for (var i = 0; i < 20; i++) MockAccessPoint(),
+    ];
+    for (final (i, accessPoint) in accessPoints.indexed) {
+      when(accessPoint.name).thenReturn('ap$i');
+      when(accessPoint.strength).thenReturn(50);
+      when(accessPoint.isOpen).thenReturn(true);
+      when(device.isSelectedAccessPoint(accessPoint)).thenReturn(false);
+      when(device.isActiveAccessPoint(accessPoint)).thenReturn(false);
+    }
+    when(device.accessPoints).thenReturn(accessPoints);
+
+    final model = buildWifiModel(devices: [device], isEnabled: true);
+
+    await tester.pumpApp(
+      (_) => ProviderScope(
+        overrides: [
+          wifiModelProvider.overrideWith((_) => model),
+        ],
+        child: Material(
+          child: Column(
+            children: [
+              WifiView(
+                expanded: true,
+                onEnabled: () {},
+                onSelected: (_, __) {},
+                onActivated: (_, __) {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final before = tester.getTopLeft(find.text('ap3')).dy;
+    // a touch drag, as on a touchscreen
+    await tester.drag(find.text('ap2'), const Offset(0, -100));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(find.text('ap3')).dy, lessThan(before - 50));
   });
 
   testWidgets('wifi disabled', (tester) async {

@@ -242,7 +242,15 @@ class WifiListTile extends ConsumerWidget {
             onSelected(device, accessPoint);
           },
           onDoubleTap: onActivated != null
-              ? () => onActivated!(device, accessPoint)
+              ? () {
+                  // Select the double-clicked access point again before
+                  // activating it, so the connection always goes to the
+                  // network that was double-clicked even if the selection
+                  // changed in between.
+                  device.selectAccessPoint(accessPoint);
+                  onSelected(device, accessPoint);
+                  onActivated!(device, accessPoint);
+                }
               : null,
         ),
     ];
